@@ -1,0 +1,194 @@
+# -*- coding: utf-8 -*-
+
+
+#Imports
+from Bio import SeqIO
+from Bio.Blast import NCBIWWW, NCBIXML
+from Bio.SeqRecord import SeqRecord
+from Bio.Alphabet import IUPAC
+from Bio.Seq import Seq
+import re
+from Bio import ExPASy
+from Bio import SwissProt
+#Ler Ficheiro de Interesse
+
+epc1 = SeqIO.read("epc1_NM_025209.4.gb", "genbank") 
+h3f3b = SeqIO.read("h3f3b_NM_008211.3.gb", "genbank") 
+
+
+for f in epc1.features:
+    if f.type=="CDS":
+        fasta_seq_epc1 = SeqRecord(Seq(f.qualifiers["translation"][0], IUPAC.protein)) #String. Recolhe a traducao da feature respetiva a cada iteracao.
+        fasta_seq_epc1.id = "NM_025209.4"
+        fasta_seq_epc1.name = "epc1"
+for f in h3f3b.features:
+    if f.type=="CDS":
+        fasta_seq_h3f3b = SeqRecord(Seq(f.qualifiers["translation"][0], IUPAC.protein)) #String. Recolhe a traducao da feature respetiva a cada iteracao.
+        fasta_seq_h3f3b.name  = "h3f3b"
+        fasta_seq_h3f3b.id = "NM_000160.5"
+
+"""
+até aqui só fomos buscar a sequência e guardar num objeto SeqRecord
+
+o código disto parece grande, mas é porque está duplicado para os dois genes
+"""
+
+
+
+#Executar o blast e exportar       
+save_file = open("my_blast_epc1.xml", "w")
+result_handle = NCBIWWW.qblast("blastp", "swissprot", fasta_seq_epc1.format("fasta"))
+print("BLAST terminado")
+save_file.write(result_handle.read())
+save_file.close()
+result_handle.close()
+
+
+result_handle = NCBIWWW.qblast("blastp", "swissprot", fasta_seq_h3f3b.format("fasta"))
+print("BLAST terminado")
+save_file2 = open("my_blast_h3f3b.xml", "w")
+save_file2.write(result_handle.read())
+save_file2.close()
+result_handle.close()
+
+"""
+façam o blast só da primeira vez que correrem isto, porque ainda demora uns minutos; 
+mudei a base de dados de "nr" para swissprot, uma vez que a swissprot é verificada manualmente, e por isso
+mais fiável;
+
+"""
+
+epc1_funcs = []
+h3f3b_funcs = []
+uniprot_ids_epc1 = []
+uniprot_ids_h3f3b = []
+
+
+"""
+as listas epc1_funcs e h3f3b_funcs vão ser usadas para guardar as funções obtidas pelo blast; será util para
+depois tentar automatizar uma forma de desccobrir a função da proteína através do blast, como diz no 
+enunciado; as listas uniprot_ids_epc1 e uniprot_ids_h3f3b vão ser usadas para guardar os ids da uniprot dos
+resultados do blast; isto será util para depois obter as sequencias desses resultados e guardar em ficheiros
+fasta, que podem depois ser usados para alinhamentos multiplos e árvores filogenéticas.
+
+"""
+
+result_handle = open("my_blast_epc1.xml")    
+blast_record = NCBIXML.read(result_handle)      
+result_handle.close()
+file=open('best_results_epc1.xml', 'w')
+e_value = 10**(-30)        
+               
+for alignment in blast_record.alignments:
+    for hsp in alignment.hsps:
+        if hsp.expect < e_value:
+            file.write('****Alignment****'+'\n'+'sequence:'+alignment.title+'\n'+
+                      'lenghth:'+ str(alignment.length)+'\n'+'e-value:'+ str(hsp.expect)+'\n'+
+                      hsp.query +'\n'+hsp.match +'\n'+
+                      hsp.sbjct +"\n"*2)
+            align_function = alignment.title.split("|")
+            uniprot_ids_epc1.append(align_function[1])
+            for j in align_function:
+                if "RecName" in j:
+                    reg = "Full=(.*)\["
+                    f=re.search(reg,j).group(1)
+                    f=f.split(";")[0].strip()
+
+            epc1_funcs.append(f)
+                          
+file.close()
+
+result_handle = open("my_blast_h3f3b.xml")    
+blast_record = NCBIXML.read(result_handle)      
+result_handle.close()
+file=open('best_results_h3f3b.xml', 'w')            
+for alignment in blast_record.alignments:
+    for hsp in alignment.hsps:
+        if hsp.expect < e_value:   
+            file.write('****Alignment****'+'\n'+'sequence:'+alignment.title+'\n'+
+                      'lenghth:'+ str(alignment.length)+'\n'+'e-value:'+ str(hsp.expect)+'\n'+
+                      hsp.query +'\n'+hsp.match +'\n'+
+                      hsp.sbjct +"\n"*2)
+
+            align_function = alignment.title.split("|")   #tratar o title para obter só a parte com a função
+            uniprot_ids_h3f3b.append(align_function[1])
+            for j in align_function:
+                if "RecName" in j:
+                    reg = "Full=(.*)\["
+                    f=re.search(reg,j).group(1)
+                    f=f.split(";")[0].strip()
+            h3f3b_funcs.append(f)
+                          
+file.close()
+
+
+
+"""
+para cada gene, foram escolhidos apenas os melhores resultados (e-value<10^-30 - este valor foi escolhido 
+empiricamente, podem mudar se quiserem); esses resultados são guardados em ficheiros (best_results_epc1/h3f3b))
+como disse acima, criei listas com a função de cada resultado do blast; a seguir vamos ver qual foi
+a função que surgiu mais vezes; é uma forma simples de ver a função de uma proteína, mas acho que para o tipo
+de trabalho e tempo disponivel está bom
+    
+"""
+function_epc1 = ''
+best_function_count_epc1 = 0
+for func in epc1_funcs:
+    if epc1_funcs.count(func) > best_function_count_epc1:
+        best_function_count_epc1 = epc1_funcs.count(func)
+        function_epc1 = func
+
+function_h3f3b = ''
+best_function_count_h3f3b = 0
+for func in h3f3b_funcs:
+    if h3f3b_funcs.count(func) > best_function_count_h3f3b:
+        best_function_count_h3f3b = h3f3b_funcs.count(func)
+        function_h3f3b = func
+
+print("Função de epc1: " + function_epc1)
+print("Função de h3f3b: " + function_h3f3b)
+
+
+
+"""
+por fim, vamos buscar as seqs dos resultados do blast à uniprot, e guardar em ficheiros fasta, um para
+gene; podem usar esses ficheiros para alinhamentos multiplos e árvores
+"""
+
+blast_sequences_epc1 = {}
+for uni_id in uniprot_ids_epc1:
+    try:                            
+        handle = ExPASy.get_sprot_raw(uni_id)
+        record = SwissProt.read(handle)
+    except Exception as e:
+        print(uni_id,e)
+    if record.organism not in blast_sequences_epc1.keys():
+        blast_sequences_epc1[record.organism.lower()] = record.sequence
+
+file = open("blast_sequences_epc1.fasta", "w")
+ 
+for key in blast_sequences_epc1.keys():
+    file.write(">" + key +  "\n" + blast_sequences_epc1[key] + "\n"*2)
+
+
+file.close()
+
+blast_sequences_h3f3b = {}
+
+for uni_id in uniprot_ids_epc1:
+    try:                            
+        handle = ExPASy.get_sprot_raw(uni_id)
+        record = SwissProt.read(handle)
+    except Exception as e:
+        print(uni_id,e)
+    if record.organism not in blast_sequences_h3f3b.keys():
+        blast_sequences_h3f3b[record.organism.lower()] = record.sequence
+
+file = open("blast_sequences_h3f3b.fasta", "w")
+ 
+for key in blast_sequences_h3f3b.keys():
+    file.write(">" + key +  "\n" + blast_sequences_h3f3b[key] + "\n"*2)
+
+
+file.close()
+
