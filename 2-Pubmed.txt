@@ -1,0 +1,79 @@
+
+#Imports
+from Bio import Entrez
+from Bio import Medline
+
+#Aceder
+Entrez.email = "ritamachado99@live.com.pt"
+
+
+handle_epc1 = Entrez.egquery(term = "epc1")
+record_epc1 = Entrez.read(handle_epc1)
+
+handle_h3f3b = Entrez.egquery(term = "h3f3b")
+record_h3f3b = Entrez.read(handle_h3f3b)
+
+#Contar Numero de Artigos
+for row in record_epc1["eGQueryResult"]:
+    if row["DbName"]=="pubmed":
+        total_epc1 = row["Count"]
+		
+#Contar Numero de Artigos
+for row in record_h3f3b["eGQueryResult"]:
+    if row["DbName"]=="pubmed":
+        total_h3f3b = row["Count"]
+
+
+#Baixar identificacoes PubMed dos Artigos
+handle_epc1 = Entrez.esearch(db = "pubmed", term = "epc1")
+record_epc1 = Entrez.read(handle_epc1)
+idlist_epc1 = record_epc1["IdList"]
+
+
+handle_h3f3b = Entrez.esearch(db = "pubmed", term = "h3f3b")
+record_h3f3b = Entrez.read(handle_h3f3b)
+idlist_h3f3b = record_h3f3b["IdList"]
+
+# #Extrair Dados
+handle_epc1 = Entrez.efetch(db="pubmed", id=idlist_epc1, rettype="medline", retmode="text")
+records_epc1 = list(Medline.parse(handle_epc1))
+
+handle_h3f3b = Entrez.efetch(db="pubmed", id=idlist_h3f3b, rettype="medline", retmode="text")
+records_h3f3b = list(Medline.parse(handle_h3f3b))
+
+
+
+# #Exportar
+record_results = open("PubMed_articles_epc1.txt", 'w')
+for record in records_epc1:
+    L1 = "Title: " + str(record.get("TI","?")) + "\n"
+    L2 = "Authors: " + str(record.get("AU", "?")) + "\n"
+    L3 = "Source: " + str(record.get("SO", "?")) + "\n"
+    record_results.write(L1)
+    record_results.write(L2)
+    record_results.write(L3)
+    record_results.write("\n")
+record_results.close()
+
+
+record_results = open("PubMed_articles_h3f3b.txt", 'w')
+for record in records_h3f3b:
+    L1 = "Title: " + str(record.get("TI","?")) + "\n"
+    L2 = "Authors: " + str(record.get("AU", "?")) + "\n"
+    L3 = "Source: " + str(record.get("SO", "?")) + "\n"
+    record_results.write(L1)
+    record_results.write(L2)
+    record_results.write(L3)
+    record_results.write("\n")
+record_results.close()
+
+
+print("Terminado!")
+
+
+
+
+
+
+
+

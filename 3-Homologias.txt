@@ -1,0 +1,166 @@
+
+
+
+#Imports
+from Bio import SeqIO
+from Bio.Blast import NCBIWWW, NCBIXML
+from Bio.SeqRecord import SeqRecord
+from Bio.Alphabet import IUPAC
+from Bio.Seq import Seq
+import re
+from Bio import ExPASy
+from Bio import SwissProt
+#Ler Ficheiro de Interesse
+
+epc1 = SeqIO.read("epc1_NM_025209.4.gb", "genbank") 
+h3f3b = SeqIO.read("h3f3b_NM_008211.3.gb", "genbank") 
+
+
+for f in epc1.features:
+    if f.type=="CDS":
+        fasta_seq_epc1 = SeqRecord(Seq(f.qualifiers["translation"][0], IUPAC.protein)) #String. Recolhe a traducao da feature respetiva a cada iteracao.
+        fasta_seq_epc1.id = "NM_025209.4"
+        fasta_seq_epc1.name = "epc1"
+for f in h3f3b.features:
+    if f.type=="CDS":
+        fasta_seq_h3f3b = SeqRecord(Seq(f.qualifiers["translation"][0], IUPAC.protein)) #String. Recolhe a traducao da feature respetiva a cada iteracao.
+        fasta_seq_h3f3b.name  = "h3f3b"
+        fasta_seq_h3f3b.id = "NM_000160.5"
+
+
+
+
+
+#Executar o blast e exportar       
+save_file = open("my_blast_epc1.xml", "w")
+result_handle = NCBIWWW.qblast("blastp", "swissprot", fasta_seq_epc1.format("fasta"))
+print("BLAST terminado")
+save_file.write(result_handle.read())
+save_file.close()
+result_handle.close()
+
+
+result_handle = NCBIWWW.qblast("blastp", "swissprot", fasta_seq_h3f3b.format("fasta"))
+print("BLAST terminado")
+save_file2 = open("my_blast_h3f3b.xml", "w")
+save_file2.write(result_handle.read())
+save_file2.close()
+result_handle.close()
+
+
+
+epc1_funcs = []
+h3f3b_funcs = []
+uniprot_ids_epc1 = []
+uniprot_ids_h3f3b = []
+
+
+
+
+result_handle = open("my_blast_epc1.xml")    
+blast_record = NCBIXML.read(result_handle)      
+result_handle.close()
+file=open('best_results_epc1.xml', 'w')
+e_value = 10**(-30)        
+               
+for alignment in blast_record.alignments:
+    for hsp in alignment.hsps:
+        if hsp.expect < e_value:
+            file.write('****Alignment****'+'\n'+'sequence:'+alignment.title+'\n'+
+                      'lenghth:'+ str(alignment.length)+'\n'+'e-value:'+ str(hsp.expect)+'\n'+
+                      hsp.query +'\n'+hsp.match +'\n'+
+                      hsp.sbjct +"\n"*2)
+            align_function = alignment.title.split("|")
+            uniprot_ids_epc1.append(align_function[1])
+            for j in align_function:
+                if "RecName" in j:
+                    reg = "Full=(.*)\["
+                    f=re.search(reg,j).group(1)
+                    f=f.split(";")[0].strip()
+
+            epc1_funcs.append(f)
+                          
+file.close()
+
+result_handle = open("my_blast_h3f3b.xml")    
+blast_record = NCBIXML.read(result_handle)      
+result_handle.close()
+file=open('best_results_h3f3b.xml', 'w')            
+for alignment in blast_record.alignments:
+    for hsp in alignment.hsps:
+        if hsp.expect < e_value:   
+            file.write('****Alignment****'+'\n'+'sequence:'+alignment.title+'\n'+
+                      'lenghth:'+ str(alignment.length)+'\n'+'e-value:'+ str(hsp.expect)+'\n'+
+                      hsp.query +'\n'+hsp.match +'\n'+
+                      hsp.sbjct +"\n"*2)
+
+            align_function = alignment.title.split("|")   #tratar o title para obter só a parte com a função
+            uniprot_ids_h3f3b.append(align_function[1])
+            for j in align_function:
+                if "RecName" in j:
+                    reg = "Full=(.*)\["
+                    f=re.search(reg,j).group(1)
+                    f=f.split(";")[0].strip()
+            h3f3b_funcs.append(f)
+                          
+file.close()
+
+
+
+function_epc1 = ''
+best_function_count_epc1 = 0
+for func in epc1_funcs:
+    if epc1_funcs.count(func) > best_function_count_epc1:
+        best_function_count_epc1 = epc1_funcs.count(func)
+        function_epc1 = func
+
+function_h3f3b = ''
+best_function_count_h3f3b = 0
+for func in h3f3b_funcs:
+    if h3f3b_funcs.count(func) > best_function_count_h3f3b:
+        best_function_count_h3f3b = h3f3b_funcs.count(func)
+        function_h3f3b = func
+
+print("Função de epc1: " + function_epc1)
+print("Função de h3f3b: " + function_h3f3b)
+
+
+
+
+blast_sequences_epc1 = {}
+for uni_id in uniprot_ids_epc1:
+    try:                            
+        handle = ExPASy.get_sprot_raw(uni_id)
+        record = SwissProt.read(handle)
+    except Exception as e:
+        print(uni_id,e)
+    if record.organism not in blast_sequences_epc1.keys():
+        blast_sequences_epc1[record.organism.lower()] = record.sequence
+
+file = open("blast_sequences_epc1.fasta", "w")
+ 
+for key in blast_sequences_epc1.keys():
+    file.write(">" + key +  "\n" + blast_sequences_epc1[key] + "\n"*2)
+
+
+file.close()
+
+blast_sequences_h3f3b = {}
+
+for uni_id in uniprot_ids_epc1:
+    try:                            
+        handle = ExPASy.get_sprot_raw(uni_id)
+        record = SwissProt.read(handle)
+    except Exception as e:
+        print(uni_id,e)
+    if record.organism not in blast_sequences_h3f3b.keys():
+        blast_sequences_h3f3b[record.organism.lower()] = record.sequence
+
+file = open("blast_sequences_h3f3b.fasta", "w")
+ 
+for key in blast_sequences_h3f3b.keys():
+    file.write(">" + key +  "\n" + blast_sequences_h3f3b[key] + "\n"*2)
+
+
+file.close()
+
