@@ -1,0 +1,127 @@
+# -*- coding: utf-8 -*-
+
+
+#Imports
+from Bio import SeqIO
+from Bio import Entrez
+
+
+#Retirar a informaÃ§Ã£o necessÃ¡ria do site NCBI
+
+
+def get_ncbi_files(gene, nuc_ids):
+    Entrez.email = "ritamachado99@live.com.ot"
+    for nid in nuc_ids:
+        handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=nid)#Define zona de interesse no Genoma
+        seq_record = SeqIO.read(handle, "gb")
+        SeqIO.write(seq_record, gene + "_" + nid + '.gb', "genbank") #Exporta ficheiro. .
+        handle.close()
+
+def print_info(gene, nuc_ids):
+    for nid in nuc_ids:
+        record = SeqIO.read(gene + "_" + nid+".gb", "genbank")
+        print("Informações importantes do Gene:")
+        print("")
+        print ("KEYWORDS: ",record.annotations.keys())
+        print("")
+        print ("NCBI accessions: ", record.annotations["accessions"])
+        print("")
+        print ("REFERÊNCIAS: ", record.annotations["references"])
+        print("")
+        print ("TAXONOMIA: ", record.annotations["taxonomy"])
+        print("")
+        print ("ESPÉCIE: ", record.annotations["organism"])
+        print("")
+        print ("DATA: ", record.annotations["date"])
+        print("")
+        print ("SEQUENCE VERSION:", record.annotations["sequence_version"])
+        print("")
+        print ("COMENTÁRIO: ", record.annotations["comment"])
+        print ("Anotacoes:")
+        print ("Features")
+        print (len(record.features))
+        for f in record.features:
+            print (f.type, f.location)
+    
+        featcds = []
+        for i in range(len(record.features)):
+            if record.features[i].type == "CDS":
+                featcds.append(i)
+        
+        print ("Features CDS")
+        print (len(featcds))
+        for k in featcds:
+            print ("Proteí­na resultante:" , record.features[k].qualifiers["product"])
+            print ("")
+            print ("Tradução:" , record.features[k].qualifiers["translation"])
+        
+        
+
+
+
+def write_info(gene, nuc_ids):
+    file = open(gene + ".xls", "w")
+        
+    columns = ["NCBI ID", "Versão da Sequência", "Referências", "Taxonomia", "Espécie", "Comentários", 
+           "Feature names", "Feature location", "Proteína resultante", "Tradução"]
+    
+    for col in columns:
+        file.write(col + "\t")
+    file.write("\n")
+    for nid in nuc_ids:
+        record = SeqIO.read(gene + "_" + nid+".gb", "genbank")
+        accessions = ''.join(str(e) for e in record.annotations["accessions"])
+        version = str(record.annotations["sequence_version"]) 
+        references = ''.join(str(record.annotations["references"]))
+        taxonomy = ', '.join(str(e) for e in record.annotations["taxonomy"])
+        organism = str(record.annotations["organism"])
+        comments = record.annotations["comment"].replace("\n", " ")
+        feat_types = []
+        feat_locations = []
+        for feat in record.features:
+            feat_types.append(str(feat.type))
+            feat_locations.append(str(feat.location))
+            if feat.type == "CDS":
+                product = ''.join(feat.qualifiers["product"])
+                translation = ''.join(feat.qualifiers["translation"])
+        feat_types  = ', '.join(str(e) for e in feat_types)
+        feat_locations  = ', '.join(str(e) for e in feat_locations)
+        file.write(accessions + "\t" + version + "\t" + references + "\t" + taxonomy + "\t" + organism + "\t"
+                   + comments + "\t" + feat_types + "\t" + feat_locations + "\t" + product + "\t" + 
+                   translation + "\n") 
+        
+    
+    file.close()        
+
+
+def test():
+    nuc_ids_epc1 = ["NM_001272004.2", "NM_001272019.3", "NM_001282391.2", "NM_025209.4"]
+    nuc_ids_gcgr = ["NM_008211.3"]
+    get_ncbi_files("epc1", nuc_ids_epc1)
+    get_ncbi_files("h3f3b" ,nuc_ids_gcgr)
+    print_info("epc1" , nuc_ids_epc1)
+    print_info("h3f3b", nuc_ids_gcgr)
+    write_info("epc1", nuc_ids_epc1)
+    write_info("h3f3b", nuc_ids_gcgr)
+
+test()
+
+
+"""
+separei o código em 3 funções, para ser mais fácil correr partes do código separadamente.
+A primeira acede ao ncbi e guarda o ficheiro;
+a base de dados "gene" só permite obter ficheiros em xml, não dá para obter em genbank; por isso,
+ao fazer SeqIO.read(handle,"gb") dava erro, porque o handle está em xml e não em gb.
+Por isso, mudei a db para "nucleotide"; como no enunciado fala em variantes (ou isoformas), fui à página do
+gene EPC1 no ncbi, e juntei os ids das várias isoformas numa lista (nuc_ids_epc1). Para cada uma delas,
+vamos aceder à informação e guardar num ficheiro, em que o nome é o id da isoforma.
+
+A segunda função, vocês já a tinham. Alterei algumas informações, que eram redundantes, ou seja, aparecem
+em mais de um local.
+
+adicionei uma função para escrever as informações consideradas relevantes num ficheiro xls (Excel), 
+não só para guardar a informação, mas também pq assim será mais fácil passar isso para o site penso eu
+a função de teste tem a lista dos nucleotide ids, e chama (faz correr) as funções acima descritas
+
+"""
+
